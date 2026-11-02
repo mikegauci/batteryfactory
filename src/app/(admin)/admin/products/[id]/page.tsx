@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ProductEditor } from "@/components/admin/product-editor";
 import type { ProductInput } from "../actions";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { DuplicateProductButton } from "@/components/admin/duplicate-product-button";
 export default async function Page({
   params,
 }: {
@@ -29,7 +30,10 @@ export default async function Page({
     .in("id", ids);
   return (
     <>
-      <AdminPageHeader title="Edit product" />
+      <AdminPageHeader
+        title="Edit product"
+        actions={<DuplicateProductButton id={p.id} />}
+      />
       <ProductEditor
         initial={{
           ...p,

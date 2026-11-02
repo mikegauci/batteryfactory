@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { formatPrice } from "@/lib/format";
+import { DuplicateProductButton } from "@/components/admin/duplicate-product-button";
 export const metadata = { title: "Products" };
 export default async function Page() {
   const db = await createClient();
@@ -41,6 +42,9 @@ export default async function Page() {
                   {v}
                 </th>
               ))}
+              <th className="p-3">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -64,6 +68,12 @@ export default async function Page() {
                     : formatPrice(p.price_cents)}
                 </td>
                 <td>{p.stock_status.replaceAll("_", " ")}</td>
+                <td className="p-3 text-right">
+                  <DuplicateProductButton
+                    id={p.id}
+                    className="text-sm underline"
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
