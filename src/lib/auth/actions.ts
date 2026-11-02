@@ -42,6 +42,7 @@ export async function signIn(
     error: "Incorrect username/email or password.",
     fields,
   });
+  let home = "/my-account/";
   try {
     const email = await resolveLoginEmail(identifier, async (username) => {
       const admin = createAdminClient();
@@ -56,69 +57,22 @@ export async function signIn(
     });
     if (!email) return fail();
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) return fail();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    home = profile?.role === "admin" ? "/admin/" : "/my-account/";
   } catch {
     return fail();
   }
 
-  redirect(safeNext(formData.get("next"), "/my-business/"));
-}
-
-export async function signUp(
-  _: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const firstName = field(formData, "first_name");
-  const lastName = field(formData, "last_name");
-  const username = field(formData, "username").toLowerCase();
-  const email = field(formData, "email");
-  const password = String(formData.get("password") ?? "");
-  const fields = {
-    first_name: firstName,
-    last_name: lastName,
-    username,
-    email,
-    email_confirm: field(formData, "email_confirm"),
-  };
-  const fail = (error: string) => ({ error, fields });
-
-  if (!firstName || !lastName || !username || !email || !password)
-    return fail("Please fill in all required fields.");
-  if (!/^[a-z0-9]{3,32}$/.test(username))
-    return fail("Only lower case letters (a-z) and numbers (0-9) are allowed.");
-  if (email.toLowerCase() !== field(formData, "email_confirm").toLowerCase())
-    return fail("Email addresses do not match.");
-  if (password !== String(formData.get("password_confirm") ?? ""))
-    return fail("Passwords do not match.");
-  if (password.length < 8)
-    return fail("Password must be at least 8 characters.");
-
-  const supabase = await createClient();
-  const { data: available } = await supabase.rpc("username_available", {
-    candidate: username,
-  });
-  if (available === false) return fail("That username is already taken.");
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${await origin()}/auth/callback?next=/my-business/`,
-      data: {
-        first_name: firstName,
-        last_name: lastName,
-        username,
-        account_type: "business",
-      },
-    },
-  });
-  if (error) return fail(error.message);
-
-  return { message: "Check your email to confirm your account." };
+  redirect(safeNext(formData.get("next"), home));
 }
 
 export async function requestPasswordReset(
@@ -130,7 +84,7 @@ export async function requestPasswordReset(
 
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${await origin()}/auth/callback?next=/update-password/`,
+    redirectTo: `${await origin()}/auth/callback?next=/my-account/reset-password/`,
   });
   return {
     message:
@@ -153,7 +107,7 @@ export async function updatePassword(
   if (error)
     return { error: "Your reset link has expired. Request a new one." };
 
-  redirect("/my-business/");
+  redirect("/my-account/");
 }
 
 export async function signOut() {

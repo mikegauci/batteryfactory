@@ -16,11 +16,8 @@ export const RESERVED_SLUGS = new Set([
   "auth",
   "cart",
   "checkout",
-  "login",
   "my-account",
   "product",
   "product-category",
-  "reset-password",
   "shop-batteries-and-accessories",
-  "update-password",
 ]);

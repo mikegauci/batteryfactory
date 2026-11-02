@@ -43,7 +43,7 @@
 @layer components {
   /* Thin section title with a short green rule under it ("Our journey & values"). */
   .section-title {
-    @apply border-brand inline-block border-b pb-0.5 text-[30px] leading-[1.3] font-extralight;
+    @apply border-brand inline-block border-b pb-0.5 text-[26px] leading-[1.3] font-extralight md:text-[30px];
   }
 
   .bf-button {

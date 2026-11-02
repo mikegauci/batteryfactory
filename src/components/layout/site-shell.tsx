@@ -2,6 +2,7 @@ import { getSiteSettings } from "@/lib/site-settings";
 import { siteNavigation } from "@/lib/navigation";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { ScrollTop } from "@/components/layout/scroll-top";
 
 export async function SiteShell({ children }: { children: React.ReactNode }) {
   const settings = await getSiteSettings();
@@ -10,6 +11,7 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
       <Header navigation={siteNavigation(settings.navigation)} />
       <main className="flex-1">{children}</main>
       <Footer />
+      <ScrollTop />
     </>
   );
 }

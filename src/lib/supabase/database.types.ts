@@ -39,6 +39,7 @@ export type Database = {
 
       shop_checkouts: {
         Row: {
+          customer_details: Json | null;
           id: string;
           customer_id: string | null;
           expires_at: string | null;
@@ -60,6 +61,7 @@ export type Database = {
           created_at: string;
         };
         Insert: {
+          customer_details?: Json | null;
           id: string;
           customer_id?: string | null;
           expires_at?: string | null;
@@ -81,6 +83,7 @@ export type Database = {
           created_at?: string;
         };
         Update: {
+          customer_details?: Json | null;
           expires_at?: string | null;
           last_error?: string;
           livemode?: boolean;
@@ -386,6 +389,7 @@ export type Database = {
       };
       product_categories: {
         Row: {
+          parent_id: string | null;
           created_at: string;
           description: string;
           id: string;
@@ -396,6 +400,7 @@ export type Database = {
           wp_id: number | null;
         };
         Insert: {
+          parent_id?: string | null;
           created_at?: string;
           description?: string;
           id?: string;
@@ -406,6 +411,7 @@ export type Database = {
           wp_id?: number | null;
         };
         Update: {
+          parent_id?: string | null;
           created_at?: string;
           description?: string;
           id?: string;

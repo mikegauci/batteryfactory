@@ -1,22 +1,21 @@
-import { getPageImage, getStaticPage } from "@/lib/static-pages";
+import { getStaticPage } from "@/lib/static-pages";
 import { hasManagedContent } from "@/lib/page-content";
-import { PageHero } from "@/components/page-hero";
+import { Container } from "@/components/layout/container";
 import type { Tables } from "@/lib/supabase/database.types";
 
+// A CMS page in the live theme's layout: thin title with the green rule,
+// then the page content.
 export async function StaticPageContent({ page }: { page: Tables<"pages"> }) {
-  const image = page.hero_media_id
-    ? await getPageImage(page.hero_media_id)
-    : null;
   return (
-    <>
-      <PageHero image={image} title={page.title} />
+    <Container className="min-h-[600px] pt-[60px] pb-20">
+      <h1 className="section-title">{page.title}</h1>
       {page.content && (
         <div
-          className="post-content mx-auto max-w-[1140px] px-5 py-12"
+          className="prose-bf mt-10"
           dangerouslySetInnerHTML={{ __html: page.content }}
         />
       )}
-    </>
+    </Container>
   );
 }
 

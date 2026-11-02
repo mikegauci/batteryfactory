@@ -1,21 +1,49 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
 import type { FormState } from "@/lib/auth/actions";
 
+// WooCommerce account form field: bold label with a red asterisk above a
+// full-width input.
 export function AuthInput({
   label,
+  type,
   ...props
 }: ComponentProps<"input"> & { label: string }) {
+  const [shown, setShown] = useState(false);
+  const password = type === "password";
   return (
     <label className="block">
-      <span className="sr-only">{label}</span>
-      <input
-        placeholder={label}
-        className="focus:border-brand w-full rounded-[10px] border border-white bg-transparent px-5 py-3 text-sm leading-[18.2px] text-white placeholder:text-white focus:outline-none"
-        {...props}
-      />
+      <span className="mb-2 block text-sm font-black">
+        {label} {props.required && <span className="text-coral">*</span>}
+      </span>
+      <span className="relative block">
+        <input
+          type={password && shown ? "text" : type}
+          className="focus:border-brand w-full border border-[#d1d5db] px-4 py-2.5 pr-12 text-base font-normal focus:outline-none"
+          {...props}
+        />
+        {password && (
+          <button
+            type="button"
+            onClick={() => setShown(!shown)}
+            aria-label={shown ? "Hide password" : "Show password"}
+            className="absolute top-1/2 right-3 -translate-y-1/2"
+          >
+            <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
+              <path
+                d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"
+                fill="none"
+                stroke="#000"
+                strokeWidth="1.6"
+              />
+              <circle cx="12" cy="12" r="3" />
+              {shown && <path d="m4 4 16 16" stroke="#000" strokeWidth="1.6" />}
+            </svg>
+          </button>
+        )}
+      </span>
     </label>
   );
 }
@@ -23,11 +51,7 @@ export function AuthInput({
 export function SubmitButton({ children }: { children: React.ReactNode }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="bg-brand hover:text-brand my-2.5 rounded-[5px] px-5 py-2.5 text-[15px] font-bold tracking-[1px] text-white transition-colors hover:bg-black disabled:opacity-60"
-    >
+    <button type="submit" disabled={pending} className="shop-button">
       {children}
     </button>
   );
@@ -45,5 +69,12 @@ export function FormMessage({ state }: { state: FormState }) {
     <p role="status" className="text-brand text-sm">
       {state.message}
     </p>
+  );
+}
+
+// The bordered box WooCommerce puts around account forms.
+export function AccountBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="border-line rounded-[5px] border px-6 py-8">{children}</div>
   );
 }
