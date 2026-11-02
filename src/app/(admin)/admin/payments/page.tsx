@@ -21,7 +21,7 @@ export default async function Payments() {
   const db = createAdminClient();
   const account = db ? await getStripeAccount(db) : null;
   const webhookOk = account ? await webhookIsActive(account) : false;
-  const checkoutOn = process.env.SHOP_CHECKOUT_ENABLED === "true";
+  const checkoutOn = process.env.SHOP_CHECKOUT_ENABLED !== "false";
 
   return (
     <>
@@ -69,7 +69,7 @@ export default async function Payments() {
             <dd>
               {checkoutOn
                 ? "Open to customers"
-                : "Switched off on the server (SHOP_CHECKOUT_ENABLED)"}
+                : "Switched off on the server (SHOP_CHECKOUT_ENABLED=false)"}
             </dd>
           </dl>
           <div className="mt-5 flex flex-wrap gap-3">

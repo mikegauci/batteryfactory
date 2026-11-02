@@ -23,8 +23,9 @@ import { parseCustomerDetails } from "@/lib/checkout-details";
 import type { Json } from "@/lib/supabase/database.types";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function POST(request: Request) {
-  // Enable only after recovery/reconciliation and payment acceptance checks.
-  if (process.env.SHOP_CHECKOUT_ENABLED !== "true")
+  // On by default once a Stripe key is saved; SHOP_CHECKOUT_ENABLED=false
+  // is an emergency switch.
+  if (process.env.SHOP_CHECKOUT_ENABLED === "false")
     return Response.json(
       {
         error: "Online payments are not available yet. Please try again later.",
