@@ -5,7 +5,7 @@ import { sendEmail } from "@/lib/email/send";
 import { env } from "@/lib/env";
 import type { CustomerDetails } from "@/lib/checkout-details";
 import { formatPrice } from "@/lib/format";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, stripeIsLive } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -25,9 +25,7 @@ export const RESERVATION_MINUTES = 35;
 
 // Test keys (sk_test_) create test-mode sessions; their orders are marked
 // livemode=false, hidden from the admin by default and purgeable.
-export function stripeIsLive() {
-  return Boolean(env.stripeSecretKey?.startsWith("sk_live_"));
-}
+export { stripeIsLive };
 
 // Network errors and Stripe 5xx/429 leave it unknown whether the session
 // was created; everything else is a definite "no".
@@ -69,7 +67,7 @@ export async function createCheckoutSession(
 ): Promise<
   { ok: true; url: string } | { ok: false; definite: boolean; message: string }
 > {
-  const stripe = getStripe();
+  const stripe = await getStripe(db);
   const stored = await db
     .from("shop_checkouts")
     .update({ stripe_request: params as unknown as Json })
@@ -177,7 +175,7 @@ export async function fulfillSession(
   db: Admin,
   sessionId: string,
 ): Promise<string | null> {
-  const stripe = getStripe();
+  const stripe = await getStripe(db);
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   const id = session.metadata?.checkout_id;
   if (!id || session.payment_status !== "paid") return null;
@@ -313,7 +311,8 @@ export async function sendOrderEmails(db: Admin, checkoutId: string) {
 export async function reconcileCheckouts(limit = 20) {
   const db = createAdminClient();
   if (!db || !env.stripeSecretKey) return { settled: 0, emailed: 0 };
-  const stripe = getStripe();
+  const stripe = await getStripe(db).catch(() => null);
+  if (!stripe) return { settled: 0, emailed: 0 };
   const live = stripeIsLive();
   let settled = 0;
   let emailed = 0;

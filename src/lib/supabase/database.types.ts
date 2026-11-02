@@ -784,6 +784,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      stripe_connection: {
+        Row: {
+          account_id: string;
+          account_name: string;
+          connected_at: string;
+          connected_by: string | null;
+          livemode: boolean;
+          webhook_endpoint_id: string | null;
+          webhook_secret: string | null;
+          webhook_url: string | null;
+        };
+        Insert: {
+          account_id: string;
+          account_name?: string;
+          connected_at?: string;
+          connected_by?: string | null;
+          livemode: boolean;
+          webhook_endpoint_id?: string | null;
+          webhook_secret?: string | null;
+          webhook_url?: string | null;
+        };
+        Update: {
+          account_id?: string;
+          account_name?: string;
+          connected_at?: string;
+          connected_by?: string | null;
+          livemode?: boolean;
+          webhook_endpoint_id?: string | null;
+          webhook_secret?: string | null;
+          webhook_url?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

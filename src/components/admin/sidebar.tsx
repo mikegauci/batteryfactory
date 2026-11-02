@@ -19,6 +19,7 @@ const sections: { title: string; items: Item[] }[] = [
     items: [
       { label: "Products", href: "/admin/products/", ready: true },
       { label: "Orders", href: "/admin/orders/", ready: true },
+      { label: "Payments", href: "/admin/payments/", ready: true },
     ],
   },
   {
