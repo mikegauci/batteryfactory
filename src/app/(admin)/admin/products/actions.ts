@@ -138,3 +138,81 @@ export async function saveProduct(
   revalidatePath("/admin/products/");
   return { id: productId };
 }
+// Copies a product as a draft with a free URL; SKUs are cleared because they must be unique.
+export async function duplicateProduct(
+  sourceId: string,
+): Promise<{ error: string } | { id: string }> {
+  await assertAdmin("products");
+  const db = await createClient();
+  const { data: p, error } = await db
+    .from("products")
+    .select(
+      "*,variants:product_variants(*),gallery:product_media(media_id,sort_order),categories:product_category_links(category_id),tags:product_tag_links(tag_id)",
+    )
+    .eq("id", sourceId)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!p) return { error: "Product not found." };
+  const base = `${p.slug}-copy`;
+  const { data: taken } = await db
+    .from("products")
+    .select("slug")
+    .like("slug", `${base}%`);
+  const used = new Set(taken?.map((t) => t.slug));
+  let slug = base;
+  for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+  const saved = await db.rpc("admin_save_product", {
+    target_id: null as unknown as string,
+    product: {
+      name: `${p.name} (copy)`,
+      slug,
+      short_description: p.short_description,
+      description: p.description,
+      sku: null,
+      price_cents: p.price_cents,
+      sale_price_cents: p.sale_price_cents,
+      manage_stock: p.manage_stock,
+      stock_quantity: p.stock_quantity,
+      stock_status: p.stock_status,
+      options: p.options,
+      featured_media_id: p.featured_media_id,
+      status: "draft",
+      sort_order: p.sort_order,
+      seo: p.seo,
+    } as Json,
+    variants: p.variants
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((v, i) => ({
+        id: crypto.randomUUID(),
+        option_values: v.option_values,
+        sku: null,
+        price_cents: v.price_cents,
+        sale_price_cents: v.sale_price_cents,
+        manage_stock: v.manage_stock,
+        stock_quantity: v.stock_quantity,
+        stock_status: v.stock_status,
+        image_media_id: v.image_media_id,
+        sort_order: i,
+      })) as Json,
+    gallery: p.gallery
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((g) => g.media_id),
+  });
+  if (saved.error) return { error: saved.error.message };
+  const id = saved.data;
+  if (p.categories.length) {
+    const r = await db.from("product_category_links").insert(
+      p.categories.map((c) => ({ product_id: id, category_id: c.category_id })),
+    );
+    if (r.error) return { error: r.error.message };
+  }
+  if (p.tags.length) {
+    const r = await db
+      .from("product_tag_links")
+      .insert(p.tags.map((t) => ({ product_id: id, tag_id: t.tag_id })));
+    if (r.error) return { error: r.error.message };
+  }
+  updateTag("products");
+  revalidatePath("/admin/products/");
+  return { id };
+}
