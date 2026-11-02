@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Tokens copied from the live site (Astra + battery-factory child theme). */
+@theme {
+  --font-sans: var(--font-sofia), Helvetica, Arial, sans-serif;
+
+  /* Astra's desktop breakpoint (922px), in rem so it sorts after sm/md. */
+  --breakpoint-desk: 57.625rem;
+
+  --color-brand: #009245; /* green: active links, buttons, highlights */
+  --color-brand-dark: #007a3a; /* button hover */
+  --color-ink: #424142; /* headings, dark contact panel */
+  --color-body: #424142; /* body text */
+  --color-muted: #808285; /* secondary text, form text */
+  --color-line: #e5e5e5; /* header and footer rules */
+  --color-panel: #f2f2f2; /* contact section */
+  --color-heading: #424142;
+  --color-coral: #cc3a2b; /* errors */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    @apply text-body bg-white font-sans font-medium;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  b,
+  strong {
+    font-weight: 900;
+  }
+
+  /* Highlighted words in the WordPress content (<mark> with the brand colour). */
+  mark {
+    @apply text-brand bg-transparent;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Thin section title with a short green rule under it ("Our journey & values"). */
+  .section-title {
+    @apply border-brand inline-block border-b pb-0.5 text-[30px] leading-[1.3] font-extralight;
+  }
+
+  .bf-button {
+    @apply bg-brand hover:bg-brand-dark inline-block rounded-lg px-5 py-2.5 text-[22px] leading-none font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .shop-button {
+    @apply bg-brand hover:bg-brand-dark inline-block rounded-lg px-5 py-2.5 text-xl leading-none font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}
+
+/* Typography for CMS content (pages, product descriptions). Mirrors the
+   WordPress core block styles the imported HTML relies on. */
+@layer components {
+  .prose-bf p {
+    @apply mb-3;
+  }
+  .prose-bf p:empty {
+    @apply hidden;
+  }
+  .prose-bf a {
+    @apply text-brand underline;
+  }
+  .prose-bf h2,
+  .prose-bf h3,
+  .prose-bf h4 {
+    @apply mt-6 mb-3 font-black;
+  }
+  .prose-bf h2 {
+    @apply text-[26px] leading-tight;
+  }
+  .prose-bf h3 {
+    @apply text-[22px] leading-tight;
+  }
+  .prose-bf ul,
+  .prose-bf ol {
+    @apply mb-4 ml-12 list-outside;
+  }
+  .prose-bf ul {
+    @apply list-disc;
+  }
+  .prose-bf ol {
+    @apply list-decimal;
+  }
+  .prose-bf li {
+    @apply mb-4;
+  }
+  .prose-bf img {
+    @apply h-auto max-w-full;
+  }
+  .prose-bf figure {
+    @apply m-0;
+  }
+  .prose-bf iframe {
+    @apply aspect-video h-auto w-full;
+  }
+}
+
+.shop-drawer[open] {
+  display: block;
 }

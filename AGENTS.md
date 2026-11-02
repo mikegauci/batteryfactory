@@ -1,3 +1,7 @@
+# Battery Factory
+
+Read `CLAUDE.md` first: it holds the product decisions, conventions and commands. It applies to every agent working in this repo.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
