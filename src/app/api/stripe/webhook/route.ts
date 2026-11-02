@@ -1,8 +1,8 @@
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { revalidateTag } from "next/cache";
-import { fulfillSession, sendOrderEmails, stripeIsLive } from "@/lib/checkout";
+import { fulfillSession, sendOrderEmails } from "@/lib/checkout";
 import { env } from "@/lib/env";
-import { getStripe } from "@/lib/stripe";
+import { getStripeAccount } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const HANDLED = new Set([
@@ -11,27 +11,34 @@ const HANDLED = new Set([
   "checkout.session.expired",
 ]);
 
+// Signed with the secret stored when the admin saved the Stripe key
+// (STRIPE_WEBHOOK_SECRET is the fallback for the local forwarder).
 // Stripe retries any non-2xx for up to three days, so a failure to record a
 // paid order returns 500. Email failures don't: the reconciler retries them.
 export async function POST(request: Request) {
-  if (!env.stripeWebhookSecret)
+  const db = createAdminClient();
+  const account = db && (await getStripeAccount(db).catch(() => null));
+  if (!db || !account)
     return new Response("Webhook unavailable", { status: 503 });
-  let event: Stripe.Event;
-  try {
-    event = getStripe().webhooks.constructEvent(
-      await request.text(),
-      request.headers.get("stripe-signature") ?? "",
-      env.stripeWebhookSecret,
-    );
-  } catch {
-    return new Response("Invalid signature", { status: 400 });
+  const secrets = [account.webhook_secret, env.stripeWebhookSecret].filter(
+    (s): s is string => Boolean(s),
+  );
+
+  const payload = await request.text();
+  const signature = request.headers.get("stripe-signature") ?? "";
+  let event: Stripe.Event | null = null;
+  for (const secret of secrets) {
+    try {
+      event = Stripe.webhooks.constructEvent(payload, signature, secret);
+      break;
+    } catch {}
   }
-  // Test events never touch a live deployment, and the other way round.
-  if (event.livemode !== stripeIsLive() || !HANDLED.has(event.type))
+  if (!event) return new Response("Invalid signature", { status: 400 });
+
+  // Test events never touch a live key, and the other way round.
+  if (event.livemode !== account.livemode || !HANDLED.has(event.type))
     return Response.json({ received: true });
 
-  const db = createAdminClient();
-  if (!db) return new Response("Webhook unavailable", { status: 503 });
   const session = event.data.object as Stripe.Checkout.Session;
   const checkoutId = session.metadata?.checkout_id;
   if (!checkoutId) return Response.json({ received: true });

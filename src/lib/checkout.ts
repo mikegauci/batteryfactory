@@ -23,12 +23,6 @@ type Checkout = Database["public"]["Tables"]["shop_checkouts"]["Row"];
 export const SESSION_MINUTES = 30;
 export const RESERVATION_MINUTES = 35;
 
-// Test keys (sk_test_) create test-mode sessions; their orders are marked
-// livemode=false, hidden from the admin by default and purgeable.
-export function stripeIsLive() {
-  return Boolean(env.stripeSecretKey?.startsWith("sk_live_"));
-}
-
 // Network errors and Stripe 5xx/429 leave it unknown whether the session
 // was created; everything else is a definite "no".
 function isAmbiguous(error: unknown) {
@@ -69,7 +63,7 @@ export async function createCheckoutSession(
 ): Promise<
   { ok: true; url: string } | { ok: false; definite: boolean; message: string }
 > {
-  const stripe = getStripe();
+  const { stripe } = await getStripe(db);
   const stored = await db
     .from("shop_checkouts")
     .update({ stripe_request: params as unknown as Json })
@@ -177,7 +171,7 @@ export async function fulfillSession(
   db: Admin,
   sessionId: string,
 ): Promise<string | null> {
-  const stripe = getStripe();
+  const { stripe } = await getStripe(db);
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   const id = session.metadata?.checkout_id;
   if (!id || session.payment_status !== "paid") return null;
@@ -312,9 +306,9 @@ export async function sendOrderEmails(db: Admin, checkoutId: string) {
 // and concurrently: every action underneath is idempotent.
 export async function reconcileCheckouts(limit = 20) {
   const db = createAdminClient();
-  if (!db || !env.stripeSecretKey) return { settled: 0, emailed: 0 };
-  const stripe = getStripe();
-  const live = stripeIsLive();
+  const shop = db && (await getStripe(db).catch(() => null));
+  if (!db || !shop) return { settled: 0, emailed: 0 };
+  const { stripe, live } = shop;
   let settled = 0;
   let emailed = 0;
 

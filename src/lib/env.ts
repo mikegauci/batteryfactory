@@ -4,7 +4,8 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const env = {
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  // The Stripe key itself is pasted in Admin → Payments. This is only the
+  // local forwarder's signing secret (scripts/stripe-forward.mts).
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   // Falls back to the Vercel deployment URL on previews.
   siteUrl:

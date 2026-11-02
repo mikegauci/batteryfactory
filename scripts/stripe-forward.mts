@@ -4,7 +4,8 @@
 //   pnpm stripe:forward            (default target http://localhost:3000)
 //   pnpm stripe:forward http://localhost:3100
 //
-// Needs STRIPE_SECRET_KEY=sk_test_... and STRIPE_WEBHOOK_SECRET in .env.local.
+// Needs STRIPE_SECRET_KEY=sk_test_... (the same test key saved in Admin →
+// Payments) and any STRIPE_WEBHOOK_SECRET (e.g. whsec_local) in .env.local.
 import Stripe from "stripe";
 
 const key = process.env.STRIPE_SECRET_KEY ?? "";

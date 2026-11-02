@@ -14,7 +14,8 @@ async function Receipt({
   let paid = false;
   try {
     if (session_id?.startsWith("cs_")) {
-      const s = await getStripe().checkout.sessions.retrieve(session_id);
+      const { stripe } = await getStripe();
+      const s = await stripe.checkout.sessions.retrieve(session_id);
       paid = s.payment_status === "paid" && !!s.metadata?.checkout_id;
     }
   } catch {}
