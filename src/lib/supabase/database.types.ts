@@ -784,23 +784,27 @@ export type Database = {
         };
         Relationships: [];
       };
-      stripe_connection: {
+      stripe_account: {
         Row: {
           account_id: string;
           account_name: string;
-          connected_at: string;
-          connected_by: string | null;
+          id: boolean;
           livemode: boolean;
+          secret_key: string;
+          updated_at: string;
+          updated_by: string | null;
           webhook_endpoint_id: string | null;
           webhook_secret: string | null;
           webhook_url: string | null;
         };
         Insert: {
-          account_id: string;
+          account_id?: string;
           account_name?: string;
-          connected_at?: string;
-          connected_by?: string | null;
+          id?: boolean;
           livemode: boolean;
+          secret_key: string;
+          updated_at?: string;
+          updated_by?: string | null;
           webhook_endpoint_id?: string | null;
           webhook_secret?: string | null;
           webhook_url?: string | null;
@@ -808,9 +812,11 @@ export type Database = {
         Update: {
           account_id?: string;
           account_name?: string;
-          connected_at?: string;
-          connected_by?: string | null;
+          id?: boolean;
           livemode?: boolean;
+          secret_key?: string;
+          updated_at?: string;
+          updated_by?: string | null;
           webhook_endpoint_id?: string | null;
           webhook_secret?: string | null;
           webhook_url?: string | null;

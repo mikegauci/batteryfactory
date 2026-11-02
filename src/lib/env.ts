@@ -4,9 +4,8 @@ function required(name: string, value: string | undefined): string {
 }
 
 export const env = {
-  // The platform account (Stripe Connect) that the shop's account links to.
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
-  stripeConnectClientId: process.env.STRIPE_CONNECT_CLIENT_ID,
+  // The Stripe key itself is pasted in Admin → Payments. This is only the
+  // local forwarder's signing secret (scripts/stripe-forward.mts).
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   // Falls back to the Vercel deployment URL on previews.
   siteUrl:

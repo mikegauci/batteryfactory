@@ -9,7 +9,7 @@ Rebuild of batteryfactory.mt (Malta lithium battery shop) from WordPress/WooComm
 - Never commit secrets or anything in `migration/exports/`.
 - English only. One admin to start: mikegauci@gmail.com.
 - Shop: Malta + Gozo shipping, prices include 18% VAT, free delivery on orders of €200+. Customers migrated and reset their password by magic link.
-- Stripe uses Connect (OAuth): Mike's platform account keys are env vars (`STRIPE_SECRET_KEY`, `STRIPE_CONNECT_CLIENT_ID`); the shop admin clicks "Connect with Stripe" in Admin → Payments and signs in. The site stores the account id in `stripe_connection` (service role only), creates a Connect webhook and stores its secret. Orders are direct charges on the shop's account (`getStripe()` acts on it).
+- Stripe key is pasted in the admin (Admin → Payments), not env vars: the admin pastes the secret key (restricted keys allowed); on save the server validates it, creates the webhook endpoint via the Stripe API and stores key + signing secret in `stripe_account` (service role only). The key is shown masked. `getStripe()` returns `{ stripe, live, account }`.
 - Custom in-house SEO replaces Yoast (carry over Yoast titles, descriptions and OG images).
 - Reuse Rotta's patterns (auth, admin, media, shop, SEO, email) rather than reinventing them.
 

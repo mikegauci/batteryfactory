@@ -4,115 +4,192 @@ import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Tables } from "@/lib/supabase/database.types";
 
-// Payments use Stripe Connect: the platform key (env) acts on the shop's own
-// Stripe account, which the admin links from Admin → Payments by signing in
-// to Stripe. Orders are direct charges on that account.
+// The shop's Stripe secret key is pasted in Admin → Payments and stored in
+// `stripe_account` (service role only). Saving it creates the order webhook
+// on the shop's account and stores the webhook's signing secret.
 
 type Admin = NonNullable<ReturnType<typeof createAdminClient>>;
-export type StripeConnection = Tables<"stripe_connection">;
+export type StripeAccount = Tables<"stripe_account">;
 
 export const WEBHOOK_EVENTS: Stripe.WebhookEndpointCreateParams.EnabledEvent[] =
   [
     "checkout.session.completed",
     "checkout.session.async_payment_succeeded",
     "checkout.session.expired",
-    "account.application.deauthorized",
   ];
 
-// Ties the Stripe sign-in redirect to the browser that started it.
-export const STATE_COOKIE = "bf_stripe_state";
-
+const KEY = /^(sk|rk)_(test|live)_[A-Za-z0-9]+$/;
 const NOT_READY = "Payments are not configured yet. Please try again later.";
 
-export function getPlatformStripe() {
-  if (!env.stripeSecretKey) throw new Error(NOT_READY);
-  return new Stripe(env.stripeSecretKey);
-}
+// Test keys (sk_test_) create test-mode sessions; their orders are marked
+// livemode=false, hidden from the admin by default and purgeable.
+export const keyIsLive = (key: string) => /^(sk|rk)_live_/.test(key);
 
-// Test platform keys (sk_test_) connect and charge in test mode.
-export function stripeIsLive() {
-  return Boolean(env.stripeSecretKey?.startsWith("sk_live_"));
-}
+export const maskKey = (key: string) =>
+  `${key.slice(0, key.indexOf("_", 3) + 1)}••••${key.slice(-4)}`;
 
-export async function getStripeConnection(
+export async function getStripeAccount(
   db: Admin,
-): Promise<StripeConnection | null> {
+): Promise<StripeAccount | null> {
   const { data, error } = await db
-    .from("stripe_connection")
+    .from("stripe_account")
     .select("*")
-    .eq("livemode", stripeIsLive())
     .maybeSingle();
   if (error) throw error;
   return data;
 }
 
-// A Stripe client that acts on the connected shop account.
+// The shop's Stripe client and whether it's live. Throws until a key is saved.
 export async function getStripe(db = createAdminClient()) {
-  if (!db || !env.stripeSecretKey) throw new Error(NOT_READY);
-  const connection = await getStripeConnection(db);
-  if (!connection) throw new Error(NOT_READY);
-  return new Stripe(env.stripeSecretKey, {
-    stripeAccount: connection.account_id,
-  });
+  const account = db && (await getStripeAccount(db));
+  if (!account) throw new Error(NOT_READY);
+  return {
+    stripe: new Stripe(account.secret_key),
+    live: account.livemode,
+    account,
+  };
 }
 
 export function webhookUrl() {
   return `${env.siteUrl}/api/stripe/webhook/`;
 }
 
-// One Connect webhook on the platform receives the shop account's events.
-// Recreated when the site URL changes (e.g. at go-live on batteryfactory.mt).
-export async function ensureWebhook(db: Admin, connection: StripeConnection) {
-  const stripe = getPlatformStripe();
-  const url = webhookUrl();
-  if (
-    connection.webhook_endpoint_id &&
-    connection.webhook_secret &&
-    connection.webhook_url === url
-  ) {
-    const existing = await stripe.webhookEndpoints
-      .retrieve(connection.webhook_endpoint_id)
-      .catch(() => null);
-    if (existing?.status === "enabled") return;
-  }
-  if (connection.webhook_endpoint_id)
-    await stripe.webhookEndpoints
-      .del(connection.webhook_endpoint_id)
-      .catch(() => null);
-  const endpoint = await stripe.webhookEndpoints.create({
-    url,
-    connect: true,
+// Stripe only sends webhooks to public URLs; locally use `pnpm stripe:forward`.
+export const canReceiveWebhooks = () =>
+  !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.siteUrl);
+
+async function createWebhook(stripe: Stripe) {
+  if (!canReceiveWebhooks()) return null;
+  return stripe.webhookEndpoints.create({
+    url: webhookUrl(),
     enabled_events: WEBHOOK_EVENTS,
     description: "Battery Factory shop orders",
   });
-  const { error } = await db
-    .from("stripe_connection")
-    .update({
-      webhook_endpoint_id: endpoint.id,
-      webhook_secret: endpoint.secret ?? null,
-      webhook_url: url,
-    })
-    .eq("livemode", connection.livemode);
-  if (error) throw error;
 }
 
-// Removes the link locally and its webhook. Stripe's own deauthorisation is
-// done by the caller (or already happened when the shop disconnected us).
-export async function forgetConnection(db: Admin, accountId: string) {
-  const { data } = await db
-    .from("stripe_connection")
-    .select("webhook_endpoint_id")
-    .eq("account_id", accountId)
-    .eq("livemode", stripeIsLive())
-    .maybeSingle();
-  if (data?.webhook_endpoint_id)
-    await getPlatformStripe()
-      .webhookEndpoints.del(data.webhook_endpoint_id)
+function stripeMessage(error: unknown) {
+  const e = error as { type?: string; message?: string };
+  if (e?.type === "StripeAuthenticationError")
+    return "Stripe didn’t accept this key. Copy the secret key again from Stripe → Developers → API keys.";
+  if (e?.type === "StripePermissionError")
+    return "This restricted key can’t manage webhooks or Checkout. Use the secret key, or give the restricted key write access to Checkout Sessions and Webhook Endpoints.";
+  return e?.message ?? "Stripe couldn’t be reached. Please try again.";
+}
+
+// Validates the key against Stripe, creates the webhook with it and saves
+// both. The old webhook is removed only once the new one exists.
+export async function saveStripeKey(
+  db: Admin,
+  key: string,
+  userId: string,
+): Promise<{ error: string } | void> {
+  key = key.trim();
+  if (!KEY.test(key))
+    return {
+      error:
+        "Paste the secret key that starts with sk_live_ (or sk_test_ for testing). The publishable key (pk_) won’t work here.",
+    };
+  const stripe = new Stripe(key);
+  let accountId = "";
+  let name = "";
+  try {
+    const account = await stripe.accounts.retrieveCurrent();
+    accountId = account.id;
+    name =
+      account.settings?.dashboard?.display_name ||
+      account.business_profile?.name ||
+      account.email ||
+      "";
+  } catch (error) {
+    // Restricted keys may not read the account; the webhook call below
+    // still proves the key works.
+    if ((error as { type?: string }).type !== "StripePermissionError")
+      return { error: stripeMessage(error) };
+  }
+
+  let endpoint: Stripe.WebhookEndpoint | null;
+  try {
+    endpoint = await createWebhook(stripe);
+  } catch (error) {
+    return { error: stripeMessage(error) };
+  }
+  const previous = await getStripeAccount(db);
+  const { error } = await db.from("stripe_account").upsert({
+    id: true,
+    secret_key: key,
+    livemode: keyIsLive(key),
+    account_id: accountId,
+    account_name: name,
+    webhook_endpoint_id: endpoint?.id ?? null,
+    webhook_secret: endpoint?.secret ?? null,
+    webhook_url: endpoint ? webhookUrl() : null,
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    if (endpoint)
+      await stripe.webhookEndpoints.del(endpoint.id).catch(() => null);
+    return { error: "Couldn’t save the key. Please try again." };
+  }
+  if (previous?.webhook_endpoint_id)
+    await new Stripe(previous.secret_key).webhookEndpoints
+      .del(previous.webhook_endpoint_id)
       .catch(() => null);
-  const { error } = await db
-    .from("stripe_connection")
-    .delete()
-    .eq("account_id", accountId)
-    .eq("livemode", stripeIsLive());
+}
+
+// Recreates the webhook when it's missing, disabled or points at an old
+// site URL (e.g. after moving to batteryfactory.mt).
+export async function repairWebhook(
+  db: Admin,
+): Promise<{ error: string } | void> {
+  const account = await getStripeAccount(db);
+  if (!account) return { error: "Save a Stripe key first." };
+  if (!canReceiveWebhooks())
+    return {
+      error: "Webhooks can’t reach localhost. Use pnpm stripe:forward.",
+    };
+  const stripe = new Stripe(account.secret_key);
+  try {
+    const endpoint = await createWebhook(stripe);
+    if (!endpoint) return;
+    const { error } = await db
+      .from("stripe_account")
+      .update({
+        webhook_endpoint_id: endpoint.id,
+        webhook_secret: endpoint.secret ?? null,
+        webhook_url: webhookUrl(),
+      })
+      .eq("id", true);
+    if (error) throw error;
+  } catch (error) {
+    return { error: stripeMessage(error) };
+  }
+  if (account.webhook_endpoint_id)
+    await stripe.webhookEndpoints
+      .del(account.webhook_endpoint_id)
+      .catch(() => null);
+}
+
+export async function webhookIsActive(account: StripeAccount) {
+  if (
+    !account.webhook_endpoint_id ||
+    !account.webhook_secret ||
+    account.webhook_url !== webhookUrl()
+  )
+    return false;
+  const endpoint = await new Stripe(account.secret_key).webhookEndpoints
+    .retrieve(account.webhook_endpoint_id)
+    .catch(() => null);
+  return endpoint?.status === "enabled";
+}
+
+export async function removeStripeKey(db: Admin) {
+  const account = await getStripeAccount(db);
+  if (!account) return;
+  if (account.webhook_endpoint_id)
+    await new Stripe(account.secret_key).webhookEndpoints
+      .del(account.webhook_endpoint_id)
+      .catch(() => null);
+  const { error } = await db.from("stripe_account").delete().eq("id", true);
   if (error) throw error;
 }

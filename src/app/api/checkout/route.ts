@@ -5,9 +5,8 @@ import {
   reconcileCheckouts,
   RESERVATION_MINUTES,
   SESSION_MINUTES,
-  stripeIsLive,
 } from "@/lib/checkout";
-import { getStripeConnection } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { env } from "@/lib/env";
 import { publicDb } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,8 +38,8 @@ export async function POST(request: Request) {
   // Settle lapsed reservations and pending emails after responding.
   after(() => reconcileCheckouts().catch(() => undefined));
   try {
-    if (!db || !env.stripeSecretKey || !(await getStripeConnection(db)))
-      throw new Error("Payments are not configured yet.");
+    const shop = db && (await getStripe(db).catch(() => null));
+    if (!db || !shop) throw new Error("Payments are not configured yet.");
     const text = await request.text();
     if (text.length > 16000)
       return Response.json({ error: "Cart is too large." }, { status: 400 });
@@ -156,7 +155,7 @@ export async function POST(request: Request) {
       shipping: shipping.price_cents,
       shipping_label: shipping.label,
       vat: settings.vat_rate,
-      live: stripeIsLive(),
+      live: shop.live,
       expires: new Date(now + RESERVATION_MINUTES * 60_000).toISOString(),
     });
     if (reservation.error)
