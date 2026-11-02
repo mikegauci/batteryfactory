@@ -7,6 +7,9 @@ Rebuild of batteryfactory.mt (Malta lithium battery shop) from WordPress/WooComm
 - **Exact 1:1 design and content** with the live site. When in doubt, compare against https://batteryfactory.mt.
 - **Never point batteryfactory.mt DNS (Cloudflare) at Vercel without explicit go-ahead from Mike.**
 - Never commit secrets or anything in `migration/exports/`.
+- English only. One admin to start: mikegauci@gmail.com.
+- Shop: Malta + Gozo shipping, prices include 18% VAT, free delivery on orders of €200+. Customers migrated and reset their password by magic link.
+- Custom in-house SEO replaces Yoast (carry over Yoast titles, descriptions and OG images).
 - Reuse Rotta's patterns (auth, admin, media, shop, SEO, email) rather than reinventing them.
 
 ## Stack
@@ -15,9 +18,9 @@ Rebuild of batteryfactory.mt (Malta lithium battery shop) from WordPress/WooComm
 | ------------------- | ----------------------------------------------------- |
 | App                 | Next.js (App Router), TypeScript, Tailwind            |
 | Hosting             | Vercel — team "mikegauci's projects"                  |
-| DB / Auth / Storage | Supabase (project TBD)                                |
+| DB / Auth / Storage | Supabase project `batteryfactory` (ref `dvrjnuvpvkvoyndnrwqr`, eu-north-1), org "Org 8" — a separate Supabase account from Rotta |
 | Payments            | Stripe — same account as the current WooCommerce store |
-| Email               | Resend                                                |
+| Email               | Mailjet, sender and admin notifications `info@batteryfactory.mt` |
 | Repo                | github.com/mikegauci/batteryfactory                   |
 
 ## Current site (source of truth for migration)
