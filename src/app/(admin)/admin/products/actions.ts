@@ -201,14 +201,9 @@ export async function duplicateProduct(
   if (saved.error) return { error: saved.error.message };
   const id = saved.data;
   if (p.categories.length) {
-    const r = await db
-      .from("product_category_links")
-      .insert(
-        p.categories.map((c) => ({
-          product_id: id,
-          category_id: c.category_id,
-        })),
-      );
+    const r = await db.from("product_category_links").insert(
+      p.categories.map((c) => ({ product_id: id, category_id: c.category_id })),
+    );
     if (r.error) return { error: r.error.message };
   }
   if (p.tags.length) {
