@@ -39,7 +39,24 @@ WordPress + Astra (child theme `battery-factory`) + Spectra (ultimate-addons-for
 ## Commands
 
 ```bash
-pnpm dev
-pnpm build
-pnpm lint
+pnpm dev           # local dev server (the Claude preview runs it on port 3001)
+pnpm build         # production build (stop `pnpm dev` first: both write to .next)
+pnpm lint          # eslint
+pnpm typecheck     # next typegen + tsc
+pnpm format        # prettier (with Tailwind class sorting)
+pnpm migrate       # WordPress import dry run; --apply writes to Supabase
 ```
+
+## Conventions (inherited from Rotta)
+
+- Next.js 16: middleware is `src/proxy.ts`; `cacheComponents` is on. Read `node_modules/next/dist/docs/` before using unfamiliar APIs.
+- `trailingSlash: true` keeps WordPress URLs (`/product/<slug>/`, `/shop-batteries-and-accessories/`, `/product-category/<slug>/`). Internal links always end with a slash.
+- One header style for every page (`SiteShell`); `(hero)` and `(plain)` route groups are only folders.
+- Design tokens live in `src/app/globals.css` (`brand` #009245, `ink` #424142, `panel` #f2f2f2). Font is Sofia Pro, self-hosted from the live theme. Section titles use `.section-title`, buttons `.bf-button`. Desktop breakpoint is 922px: use the `desk:` variant.
+- Homepage text and images are CMS fields in `src/lib/page-fields.ts` (defaults = live content). In text fields `*word*` is a green highlight and `**word**` bold (`RichLine`).
+- Supabase clients: `@/lib/supabase/server`, `@/lib/supabase/client`; `createAdminClient()` bypasses RLS (server only, validate input). Public data is read through `publicDb` inside `"use cache"` functions tagged by type; admin saves call `revalidateTag`.
+- Roles: `profiles.role` is `admin` or `customer`; `admin_capabilities` null = full admin, else a section allowlist (`pages`, `products`, `orders`, `media`).
+- DB changes are SQL files in `supabase/migrations/`, applied with the Supabase connector. Every migrated table has a `wp_id`. Money is integer euro cents including 18% VAT.
+- Media: public `media` bucket, rows in `public.media`, `mediaUrl(path)`. Imported files are `wp/<yyyy>/<mm>/<name>.webp`. Contact-form files go to the private `contact-uploads` bucket via signed upload URLs.
+- Email: `sendEmail()` (`@/lib/email/send`) sends through Mailjet; without keys it logs instead.
+- Products have `contact_button` (WhatsApp "Contact us now", URL in `settings.contact`) and `addons` (Advanced Product Fields checkboxes with a fixed price).
