@@ -5,17 +5,7 @@ export const PAGE_CONTENT_AREAS: Record<string, string> = {
 };
 export function pageContentMode(path: string) {
   if (path in PAGE_CONTENT_AREAS) return "section";
-  if (
-    [
-      "cart",
-      "checkout",
-      "login",
-      "reset-password",
-      "update-password",
-      "my-account",
-    ].includes(path)
-  )
-    return "seo";
+  if (["cart", "checkout", "my-account"].includes(path)) return "seo";
   return "page";
 }
 export function hasManagedContent(seo: unknown): boolean {

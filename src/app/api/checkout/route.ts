@@ -11,8 +11,15 @@ import { env } from "@/lib/env";
 import { publicDb } from "@/lib/supabase/public";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/session";
-import { PRODUCT_SELECT, getShopSettings } from "@/lib/shop";
-import { available, price, type Product } from "@/lib/shop-types";
+import { PRODUCT_SELECT, getShopSettings, shippingFor } from "@/lib/shop";
+import {
+  addonsOf,
+  available,
+  hasPrice,
+  price,
+  type Product,
+} from "@/lib/shop-types";
+import { parseCustomerDetails } from "@/lib/checkout-details";
 import type { Json } from "@/lib/supabase/database.types";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function POST(request: Request) {
@@ -48,7 +55,10 @@ export async function POST(request: Request) {
       variantId: string | null;
       quantity: number;
       options?: Record<string, string>;
+      addons?: string[];
     }[];
+    const details = parseCustomerDetails(body.details);
+    if ("error" in details) throw new Error(details.error);
     const seen = new Set<string>();
     for (const item of requested) {
       if (
@@ -59,7 +69,14 @@ export async function POST(request: Request) {
         item.quantity > 99
       )
         throw new Error("Invalid cart item.");
-      const key = `${item.variantId ?? item.productId}:${JSON.stringify(Object.entries(item.options ?? {}).sort())}`;
+      if (
+        item.addons !== undefined &&
+        (!Array.isArray(item.addons) ||
+          item.addons.length > 20 ||
+          item.addons.some((a) => typeof a !== "string"))
+      )
+        throw new Error("Invalid cart item.");
+      const key = `${item.variantId ?? item.productId}:${JSON.stringify(Object.entries(item.options ?? {}).sort())}:${[...(item.addons ?? [])].sort().join(",")}`;
       if (seen.has(key)) throw new Error("Duplicate cart item.");
       seen.add(key);
     }
@@ -82,7 +99,7 @@ export async function POST(request: Request) {
         (p.variants.length
           ? !v || !available(v, i.quantity)
           : i.variantId !== null) ||
-        (v ?? p).price_cents === null
+        !hasPrice(v ?? p)
       )
         throw new Error("A product is unavailable. Please check your cart.");
       const definitions = p.options as { name: string; values: string[] }[];
@@ -98,18 +115,34 @@ export async function POST(request: Request) {
           ))
       )
         throw new Error("Choose a valid value for every product option.");
+      const offered = addonsOf(p);
+      const chosen = [...new Set(i.addons ?? [])].map((id) =>
+        offered.find((a) => a.id === id),
+      );
+      if (chosen.some((a) => !a))
+        throw new Error(
+          "A product option has changed. Please check your cart.",
+        );
+      const addons = chosen.filter((a) => a !== undefined);
+      const addonsCents = addons.reduce((n, a) => n + a.price_cents, 0);
       return {
         product_id: p.id,
         variant_id: v?.id ?? null,
         name: p.name,
         sku: v?.sku ?? p.sku,
         quantity: i.quantity,
-        unit_price_cents: price(v ?? p),
+        unit_price_cents: price(v ?? p) + addonsCents,
+        addons_cents: addonsCents,
+        addons,
         option_values: selected,
       };
     });
     const settings = await getShopSettings();
-    const shipping = settings.shipping.find((s) => s.countries.includes("MT"));
+    const subtotal = lines.reduce(
+      (n, l) => n + l.unit_price_cents * l.quantity,
+      0,
+    );
+    const shipping = shippingFor(settings, subtotal);
     if (!shipping || !settings.prices_include_vat || settings.vat_rate !== 0.18)
       throw new Error("Delivery is unavailable. Please contact us.");
     const user = await getCurrentUser();
@@ -130,17 +163,21 @@ export async function POST(request: Request) {
         "Stock or prices have changed. Please refresh your cart and try again.",
       );
     reserved = id;
+    const saved = await db
+      .from("shop_checkouts")
+      .update({ customer_details: details as unknown as Json })
+      .eq("id", id);
+    if (saved.error) throw new Error("Checkout failed. Please try again.");
+    // Billing and delivery are taken on our checkout page; Stripe only
+    // collects the card payment.
     const result = await createCheckoutSession(db, id, {
       mode: "payment",
       allowed_payment_method_types: ["card"],
-      customer_email: user?.email,
+      customer_email: details.billing.email,
       customer_creation: "always",
       client_reference_id: id,
       metadata: { checkout_id: id },
       expires_at: Math.floor(now / 1000) + SESSION_MINUTES * 60,
-      billing_address_collection: "required",
-      phone_number_collection: { enabled: true },
-      shipping_address_collection: { allowed_countries: ["MT"] },
       shipping_options: [
         {
           shipping_rate_data: {
@@ -158,9 +195,10 @@ export async function POST(request: Request) {
           product_data: {
             name: i.name,
             description:
-              Object.values(i.option_values as Record<string, string>).join(
-                " / ",
-              ) || undefined,
+              [
+                ...Object.values(i.option_values as Record<string, string>),
+                ...i.addons.map((a) => a.label),
+              ].join(" / ") || undefined,
           },
         },
       })),

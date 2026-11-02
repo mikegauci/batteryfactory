@@ -42,7 +42,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
 export async function requireUser(next: string): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect(`/login/?next=${encodeURIComponent(next)}`);
+  if (!user) redirect(`/my-account/?next=${encodeURIComponent(next)}`);
   return user;
 }
 

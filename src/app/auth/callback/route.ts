@@ -14,5 +14,5 @@ export async function GET(request: NextRequest) {
     if (!error) return NextResponse.redirect(new URL(next, origin));
   }
 
-  return NextResponse.redirect(new URL("/login/?error=link", origin));
+  return NextResponse.redirect(new URL("/my-account/?error=link", origin));
 }

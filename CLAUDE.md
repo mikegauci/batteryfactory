@@ -59,4 +59,6 @@ pnpm migrate       # WordPress import dry run; --apply writes to Supabase
 - DB changes are SQL files in `supabase/migrations/`, applied with the Supabase connector. Every migrated table has a `wp_id`. Money is integer euro cents including 18% VAT.
 - Media: public `media` bucket, rows in `public.media`, `mediaUrl(path)`. Imported files are `wp/<yyyy>/<mm>/<name>.webp`. Contact-form files go to the private `contact-uploads` bucket via signed upload URLs.
 - Email: `sendEmail()` (`@/lib/email/send`) sends through Mailjet; without keys it logs instead.
+- Shop follows WooCommerce: `/shop-batteries-and-accessories/` (search `?s=`, sort `?orderby=`), `/product-category/<slug>/` (includes subcategories), `/product/<slug>/`, `/cart/`, `/checkout/`, `/my-account/` (login, `lost-password/`, `reset-password/`). No cart drawer: adding shows WooCommerce's notice. A zero price means "not for sale" (WooCommerce's empty price).
+- Checkout: billing/delivery entered on our page and stored on `shop_checkouts.customer_details`; Stripe hosted Checkout takes only the card. Free delivery from `settings.shop.free_shipping_min_cents`, otherwise `shipping[0].price_cents`.
 - Products have `contact_button` (WhatsApp "Contact us now", URL in `settings.contact`) and `addons` (Advanced Product Fields checkboxes with a fixed price).

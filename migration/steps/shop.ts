@@ -114,6 +114,10 @@ export function importShop(ctx: Context, users: Map<string, string>) {
         name: decodeEntities(t.name!),
         description: t.description ?? "",
         image_media_id: ctx.media.byAttachment(thumb?.meta_value)?.id ?? null,
+        parent_id:
+          t.parent && t.parent !== "0"
+            ? ctx.id("product_categories", t.parent)
+            : null,
       });
       categoryLinks.push({ product_id: id, category_id: cid });
     }
@@ -235,6 +239,11 @@ export function importShop(ctx: Context, users: Map<string, string>) {
     return true;
   });
 
+  // A parent that no product is linked to is not imported; drop the link.
+  const categoryIds = new Set([...categories.values()].map((c) => c.id));
+  for (const c of categories.values())
+    if (c.parent_id && !categoryIds.has(c.parent_id as string))
+      c.parent_id = null;
   ctx.upsert("product_categories", [...categories.values()] as never[], "id");
   ctx.upsert("product_tags", [...tags.values()] as never[], "id");
   ctx.upsert("products", productRows, "id");

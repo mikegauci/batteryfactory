@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { revalidateTag } from "next/cache";
 import { sendEmail } from "@/lib/email/send";
 import { env } from "@/lib/env";
+import type { CustomerDetails } from "@/lib/checkout-details";
 import { formatPrice } from "@/lib/format";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -180,10 +181,19 @@ export async function fulfillSession(
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   const id = session.metadata?.checkout_id;
   if (!id || session.payment_status !== "paid") return null;
-  const email = session.customer_details?.email;
+  // Details entered on our checkout page; older sessions collected them in Stripe.
+  const { data: stored } = await db
+    .from("shop_checkouts")
+    .select("customer_details")
+    .eq("id", id)
+    .maybeSingle();
+  const details = stored?.customer_details as CustomerDetails | null;
+  const email = details?.billing.email ?? session.customer_details?.email;
   if (!email || session.currency !== "eur") throw new Error("Invalid payment");
-  const delivery = address(session.collected_information?.shipping_details);
-  const billing = address(session.customer_details);
+  const delivery =
+    details?.shipping ??
+    address(session.collected_information?.shipping_details);
+  const billing = details?.billing ?? address(session.customer_details);
   if (delivery.country !== "MT")
     throw new Error("Unsupported delivery country");
   const customer = await customerFor(db, email, billing);
@@ -230,8 +240,10 @@ export async function sendOrderEmails(db: Admin, checkoutId: string) {
     ],
     rows: [
       ...order.items.map((i) => ({
-        label:
-          `${i.quantity} × ${i.name} ${Object.values((i.option_values ?? {}) as Record<string, string>).join(" / ")}`.trim(),
+        label: `${i.quantity} × ${i.name} ${[
+          ...Object.values((i.option_values ?? {}) as Record<string, string>),
+          ...((i.addons ?? []) as { label: string }[]).map((a) => a.label),
+        ].join(" / ")}`.trim(),
         value: formatPrice(i.total_cents),
       })),
       { label: "Delivery", value: formatPrice(order.shipping_cents) },
@@ -263,7 +275,7 @@ export async function sendOrderEmails(db: Admin, checkoutId: string) {
         .eq("id", c.id);
     else errors.push("customer email failed");
   }
-  const adminTo = process.env.EMAIL_ADMIN_TO;
+  const adminTo = process.env.EMAIL_ADMIN_TO || "info@batteryfactory.mt";
   if (!c.admin_email_sent && !adminTo) {
     await db
       .from("shop_checkouts")

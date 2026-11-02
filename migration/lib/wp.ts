@@ -67,7 +67,7 @@ export class Wp {
   // Terms attached to an object for a taxonomy.
   termsFor(objectId: string, taxonomy: string): Row[] {
     return this.all(
-      `select t.term_id, t.name, t.slug, tt.description from wp_term_relationships r
+      `select t.term_id, t.name, t.slug, tt.description, tt.parent from wp_term_relationships r
        join wp_term_taxonomy tt on tt.term_taxonomy_id = r.term_taxonomy_id
        join wp_terms t on t.term_id = tt.term_id
        where r.object_id = ? and tt.taxonomy = ?`,

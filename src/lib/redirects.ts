@@ -60,10 +60,12 @@ function legacyRule(path: string): Rule | null {
     return { destination: "/sitemap.xml", permanent: true };
   if (/^\/product-tag\//.test(path))
     return { destination: "/shop-batteries-and-accessories/", permanent: true };
+  if (path === "/login/" || path === "/my-account/lost-password/reset/")
+    return { destination: "/my-account/", permanent: true };
   if (path === "/shop/")
     return { destination: "/shop-batteries-and-accessories/", permanent: true };
   if (path === "/wp-login.php" || path.startsWith("/wp-admin"))
-    return { destination: "/login/", permanent: false };
+    return { destination: "/my-account/", permanent: false };
   if (path === "/hello-world/" || /\/feed\/$/.test(path))
     return { destination: "/", permanent: true };
   return null;
