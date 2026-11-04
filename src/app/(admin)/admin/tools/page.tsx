@@ -1,4 +1,6 @@
 import { ActionForm } from "@/components/admin/action-form";
+import { NavigationEditor } from "@/components/admin/navigation-editor";
+import { primaryNav, siteNavigation } from "@/lib/navigation";
 import { brokenInternalLinks } from "@/lib/admin/content-checks";
 import { RESERVED_SLUGS } from "@/lib/slug";
 import { SelectAll } from "@/components/admin/select-all";
@@ -98,10 +100,28 @@ export default async function Tools({
       .maybeSingle();
     if (error) throw error;
     const settings = (data?.value ?? {}) as Record<string, string>;
+    const { data: pages, error: pagesError } = await db
+      .from("pages")
+      .select("title,path")
+      .eq("status", "published")
+      .order("title");
+    if (pagesError) throw pagesError;
+    const links = [
+      ...primaryNav,
+      ...(pages ?? [])
+        .filter((p) => p.path)
+        .map((p) => ({ label: p.title, href: `/${p.path}/` })),
+    ].filter((l, i, all) => all.findIndex((x) => x.href === l.href) === i);
     body = (
-      <ActionForm action={saveSiteSettings} className="max-w-2xl space-y-4">
+      <ActionForm action={saveSiteSettings} className="max-w-3xl space-y-4">
+        <fieldset className="space-y-2">
+          <legend className="mb-2 font-bold">Menu</legend>
+          <NavigationEditor
+            initial={siteNavigation(settings.navigation)}
+            links={links}
+          />
+        </fieldset>
         {[
-          "navigation",
           "footerText",
           "contactEmail",
           "phone",
@@ -113,11 +133,8 @@ export default async function Tools({
           <label key={key} className="block text-sm">
             {key}
             <textarea
-              rows={key === "navigation" ? 8 : 2}
+              rows={2}
               aria-label={key}
-              placeholder={
-                key === "navigation" ? "Home | /\nShop | /shop/" : undefined
-              }
               className={`${input} mt-1 block w-full`}
               name={key}
               defaultValue={settings[key] ?? ""}
