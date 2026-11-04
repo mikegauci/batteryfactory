@@ -61,6 +61,9 @@ export const canReceiveWebhooks = () =>
 async function createWebhook(stripe: Stripe) {
   if (!canReceiveWebhooks()) return null;
   return stripe.webhookEndpoints.create({
+    // Required when the key belongs to a connected account (keys linked by
+    // the WooCommerce Stripe plugin); events then match this SDK's version.
+    api_version: Stripe.API_VERSION,
     url: webhookUrl(),
     enabled_events: WEBHOOK_EVENTS,
     description: "Battery Factory shop orders",
